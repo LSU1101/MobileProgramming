@@ -18,6 +18,7 @@ object CsvBuilder {
     private fun columns(member: String, zone: ZoneId): List<Col> = listOf(
         Col("member") { member },
         Col("id") { it.id },
+        Col("app_version") { it.appVersion },
         Col("package") { it.packageName },
         Col("is_test") { it.isTest },
         Col("test_scheduled_at") { TimeFormat.format(it.testScheduledAt, zone) },
@@ -41,6 +42,7 @@ object CsvBuilder {
         Col("category") { it.category },
         Col("is_group_summary") { it.isGroupSummary },
         Col("is_ongoing") { it.isOngoing },
+        Col("parsed_kind") { it.parsedKind },
         Col("parsed_amount") { it.parsedAmount },
         Col("parsed_card") { it.parsedCardName },
         Col("parsed_merchant") { it.parsedMerchant },

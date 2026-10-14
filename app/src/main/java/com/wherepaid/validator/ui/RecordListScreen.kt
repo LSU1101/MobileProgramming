@@ -39,6 +39,7 @@ import com.wherepaid.validator.data.PaymentRecord
 import com.wherepaid.validator.data.Settings
 import com.wherepaid.validator.export.CsvBuilder
 import com.wherepaid.validator.export.CsvShare
+import com.wherepaid.validator.parse.PaymentKind
 import com.wherepaid.validator.util.Permissions
 import com.wherepaid.validator.util.TimeFormat
 import kotlinx.coroutines.launch
@@ -63,7 +64,8 @@ fun RecordListScreen(
         missingPermission = !Permissions.hasNotificationAccess(ctx) || !Permissions.hasBackground(ctx)
     }
 
-    val real = all.filter { !it.isTest && settings.isTarget(it.packageName) }
+    // 실결제 = 대상 앱의 결제/취소 알림만 (포인트 적립, 그룹 요약 등은 '전체'에서만 보인다)
+    val real = all.filter { !it.isTest && settings.isTarget(it.packageName) && it.parsedKind.isPayment() }
     val tests = all.filter { it.isTest }
     val shown = when (filter) {
         Filter.REAL -> real
@@ -138,6 +140,8 @@ fun RecordListScreen(
 
 private enum class Filter { REAL, TEST, ALL }
 
+private fun PaymentKind?.isPayment() = this == PaymentKind.PAYMENT || this == PaymentKind.CANCEL
+
 /** 팀 목표(40건) 진행 상황을 한눈에. */
 @Composable
 private fun Summary(targets: List<PaymentRecord>) {
@@ -164,6 +168,8 @@ private fun RecordRow(r: PaymentRecord, isTarget: Boolean, onClick: () -> Unit) 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(TimeFormat.formatShort(r.receivedAt), style = MaterialTheme.typography.bodySmall)
             if (!isTarget) Text(r.packageName, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+            if (r.parsedKind == PaymentKind.POINT) Text("[적립]", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+            if (r.parsedKind == PaymentKind.OTHER) Text("[기타]", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
             if (r.isTest) Text("[테스트]", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
             if (r.actualPaidAt != null) Text("✔입력됨", style = MaterialTheme.typography.bodySmall)
         }

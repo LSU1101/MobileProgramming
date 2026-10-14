@@ -230,6 +230,7 @@ private fun RawSection(r: PaymentRecord) {
         KeyValue("알람 지연", r.testScheduledAt?.let { "${(r.receivedAt - it) / 1000.0}초" })
     }
     KeyValue("패키지", r.packageName)
+    KeyValue("앱 버전", r.appVersion)
     KeyBlock("key", r.notificationKey)
     KeyValue("postTime", TimeFormat.format(r.postTime) + " (${r.postTime})")
     KeyValue("수신 시각", TimeFormat.format(r.receivedAt) + " (${r.receivedAt})")
@@ -244,6 +245,7 @@ private fun RawSection(r: PaymentRecord) {
     KeyValue("ongoing", r.isOngoing)
 
     SectionTitle("파싱 결과 (v${r.parserVersion ?: "?"})")
+    KeyValue("종류", r.parsedKind)
     KeyValue("금액", r.parsedAmount)
     KeyValue("카드", r.parsedCardName)
     KeyValue("가맹점", r.parsedMerchant)

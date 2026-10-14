@@ -2,6 +2,7 @@ package com.wherepaid.validator.export
 
 import com.wherepaid.validator.data.LocStatus
 import com.wherepaid.validator.data.PaymentRecord
+import com.wherepaid.validator.parse.PaymentKind
 import com.wherepaid.validator.util.TimeFormat
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -39,6 +40,8 @@ class CsvBuilderTest {
         powerSaveMode = false, deviceIdleMode = false,
         appImportance = 400, appImportanceLabel = "CACHED",
         actualPaidAt = actualPaidAt,
+        appVersion = "0.1.8(8)",
+        parsedKind = PaymentKind.PAYMENT,
         refLat = refLat, refLng = refLng,
     )
 
@@ -87,6 +90,8 @@ class CsvBuilderTest {
         assertEquals("true", row["within_100m"])
         assertEquals("2026-10-14 12:00:00", row["actual_paid_at"])
         assertEquals("하나체크 | Adobe(일시불)", row["sub_text"])
+        assertEquals("0.1.8(8)", row["app_version"])
+        assertEquals("PAYMENT", row["parsed_kind"])
     }
 
     @Test

@@ -4,6 +4,7 @@ import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import com.wherepaid.validator.parse.PaymentKind
 
 /**
  * 알림 1건 = 행 1개. 같은 notificationKey가 다시 와도 새 행으로 쌓는다(중복 수신 패턴 분석용).
@@ -21,6 +22,9 @@ data class PaymentRecord(
     @ColumnInfo(defaultValue = "0") val isTest: Boolean = false,
     /** 테스트 알림 예약 시각. receivedAt과의 차이 = 알람 지연 */
     val testScheduledAt: Long? = null,
+
+    /** 기록한 앱 버전 "versionName(versionCode)". 측정 방식이 바뀐 빌드 전후 데이터를 나누는 용도 (v3) */
+    val appVersion: String? = null,
 
     // --- 원본 알림 ---
     val packageName: String,
@@ -46,6 +50,8 @@ data class PaymentRecord(
     val parsedMerchant: String? = null,
     val parsedPayType: String? = null,
     val parsedIsCancel: Boolean? = null,
+    /** 알림 종류 (결제/취소/포인트/기타). 분석에서는 PAYMENT, CANCEL만 실결제로 본다 (v3) */
+    val parsedKind: PaymentKind? = null,
     val parserVersion: Int? = null,
 
     // --- 위치 결과 ---

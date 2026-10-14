@@ -149,6 +149,8 @@ Windows에서는 `gradlew.bat assembleDebug`를 사용합니다.
 | `accuracy_m`, `loc_elapsed_ms`, `loc_fix_age_ms` | 정확도, 획득 소요 시간, 좌표의 신선도 |
 | `perm_background`, `app_importance_label`, `battery_opt_ignored`, `device_idle_mode` | 수신 시점의 권한과 앱·전원 상태 |
 | `notification_key` | 같은 key가 여러 행이면 같은 알림이 중복 또는 업데이트로 수신된 것 |
+| `parsed_kind` | 알림 종류: `PAYMENT`(결제), `CANCEL`(취소), `POINT`(포인트 적립), `OTHER`(기타). **분석은 PAYMENT, CANCEL만** 사용 |
+| `app_version` | 기록한 앱 버전 `versionName(versionCode)`. 측정 방식이 바뀐 빌드 전후 데이터를 나눌 때 사용 |
 
 ### 위치 실패 원인 (`loc_fail_reason`)
 | 값 | 의미 |
@@ -180,6 +182,11 @@ app/src/main/java/com/wherepaid/validator/
 
 ### 파서 수정
 `TossNotificationParser.kt` 상단의 "규칙" 영역(정규식, 키워드)을 고치고 `VERSION`을 올립니다. 실제 알림 원문은 상세 화면이나 CSV의 `title/text/sub_text/big_text/extras_dump`에서 확인할 수 있습니다. 새 형식을 발견하면 `TossNotificationParserTest`에 케이스를 추가하세요.
+
+### 수집하지 않는 알림
+- **진행 중(ongoing) 알림**은 기록하지 않습니다. 토스 만보기 Live Activity처럼 상태가 바뀔 때마다 다시 올라오는 알림 때문에 기록과 위치 요청이 폭주하기 때문입니다.
+- **그룹 요약 알림**(내용 없이 알림을 묶어 보여 주는 것)은 기록하되 위치는 측정하지 않습니다.
+- 포인트 적립 같은 결제가 아닌 토스 알림은 기록과 위치 측정은 하지만, `parsed_kind`로 구분해 목록의 "실결제" 탭에서 제외합니다.
 
 ### 알려진 한계
 - 상시 위치 추적은 하지 않습니다. 알림 1건당 1회만 측정합니다.
