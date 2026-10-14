@@ -56,6 +56,29 @@ class TossNotificationParserTest {
     }
 
     @Test
+    fun `토스뱅크 체크카드 - 잔액이 아니라 결제 금액을 읽는다`() {
+        // 기록 #111 원문 그대로 (text와 bigText가 같고, 둘째 줄에 잔액)
+        val body = "토스뱅크 체크카드 | 한성대학교산학협력단 케이키친한\n잔액 740,300원"
+        val p = TossNotificationParser.parse(
+            title = "10,000원 결제",
+            text = body,
+            subText = "토스뱅크",
+            bigText = body,
+        )
+        assertEquals(PaymentKind.PAYMENT, p.kind)
+        assertEquals(10_000L, p.amount)
+        assertEquals("토스뱅크 체크카드", p.cardName)
+        assertEquals("한성대학교산학협력단 케이키친한", p.merchant)
+        assertEquals(false, p.isCancel)
+    }
+
+    @Test
+    fun `결제 줄이 없어도 잔액은 금액으로 쓰지 않는다`() {
+        val p = TossNotificationParser.parse("토스뱅크", "입출금 알림\n잔액 740,300원", null, null)
+        assertNull(p.amount)
+    }
+
+    @Test
     fun `토스페이 포인트 적립은 결제가 아님`() {
         val p = TossNotificationParser.parse("포인트 적립", "토스페이 결제 혜택으로 14원 받았어요", null, null)
         assertEquals(PaymentKind.POINT, p.kind)

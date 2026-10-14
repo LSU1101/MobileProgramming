@@ -13,11 +13,13 @@ package com.wherepaid.validator.parse
  *  - 토스페이 결제       title="17,000원 결제 완료"
  *                        text="토스페이머니 · 구글페이먼트코리아 유한회사" (+ "보너스 포인트 적립 가능")
  *  - 토스페이 포인트 적립 title="포인트 적립"         text="토스페이 결제 혜택으로 14원 받았어요"
+ *  - 토스뱅크 체크카드   title="10,000원 결제"        subText="토스뱅크"
+ *                        text="토스뱅크 체크카드 | 한성대학교산학협력단 케이키친한\n잔액 740,300원"
  */
 object TossNotificationParser {
 
     /** 규칙을 바꾸면 올린다. 레코드마다 저장되어 어떤 규칙으로 파싱했는지 추적할 수 있다. */
-    const val VERSION = 2
+    const val VERSION = 3
 
     // ---------------------------------------------------------------------
     // 규칙
@@ -28,6 +30,9 @@ object TossNotificationParser {
 
     /** 결제 줄: "17,000원 결제 완료", "26,400원 결제", "5,000원 승인". 이 줄이 있어야 결제/취소로 본다. */
     private val PAYMENT_LINE = Regex("""(\d[\d,]*)\s*원\s*(결제|승인|사용)""")
+
+    /** 이 단어가 있는 줄의 금액은 결제 금액이 아니다 ("잔액 740,300원"). */
+    private val NON_PAYMENT_AMOUNT_KEYWORDS = listOf("잔액", "누적", "한도")
 
     /** 이 단어가 있으면 취소 알림. */
     private val CANCEL_KEYWORDS = listOf("취소", "환불")
@@ -53,7 +58,8 @@ object TossNotificationParser {
 
         val paymentLine = lines.firstOrNull { PAYMENT_LINE.containsMatchIn(it) }
         val kind = classify(lines, paymentLine != null)
-        val amount = paymentLine?.let(::parseAmount) ?: lines.firstNotNullOfOrNull(::parseAmount)
+        val amount = paymentLine?.let(::parseAmount)
+            ?: lines.filter { l -> NON_PAYMENT_AMOUNT_KEYWORDS.none { it in l } }.firstNotNullOfOrNull(::parseAmount)
         val cardMerchant = if (kind == PaymentKind.PAYMENT || kind == PaymentKind.CANCEL) {
             lines.filter { !AMOUNT.containsMatchIn(it) }.firstNotNullOfOrNull(::parseCardMerchant)
         } else {
