@@ -225,6 +225,10 @@ private fun LocationSection(r: PaymentRecord) {
 @Composable
 private fun RawSection(r: PaymentRecord) {
     SectionTitle("원본 알림")
+    if (r.isTest) {
+        KeyValue("테스트 알림", "예 (예약 ${TimeFormat.format(r.testScheduledAt)})")
+        KeyValue("알람 지연", r.testScheduledAt?.let { "${(r.receivedAt - it) / 1000.0}초" })
+    }
     KeyValue("패키지", r.packageName)
     KeyBlock("key", r.notificationKey)
     KeyValue("postTime", TimeFormat.format(r.postTime) + " (${r.postTime})")

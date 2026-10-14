@@ -1,5 +1,6 @@
 package com.wherepaid.validator.data
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -14,6 +15,12 @@ import androidx.room.PrimaryKey
 )
 data class PaymentRecord(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
+
+    // --- 테스트 알림 여부 (v2) ---
+    /** 앱이 스스로 띄운 테스트 알림이면 true. 실제 결제 분석에서는 제외한다. */
+    @ColumnInfo(defaultValue = "0") val isTest: Boolean = false,
+    /** 테스트 알림 예약 시각. receivedAt과의 차이 = 알람 지연 */
+    val testScheduledAt: Long? = null,
 
     // --- 원본 알림 ---
     val packageName: String,

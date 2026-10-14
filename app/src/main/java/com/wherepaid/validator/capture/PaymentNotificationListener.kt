@@ -6,6 +6,7 @@ import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.util.Log
 import com.wherepaid.validator.app
+import com.wherepaid.validator.data.Channel
 import com.wherepaid.validator.data.LocStatus
 import com.wherepaid.validator.data.PaymentRecord
 import com.wherepaid.validator.parse.TossNotificationParser
@@ -14,6 +15,7 @@ import kotlinx.coroutines.launch
 /**
  * 알림 수집. 대상 패키지(기본 토스) 알림이면 원본 저장 직후 위치를 1회 요청한다.
  * "모든 앱 알림 기록"이 켜져 있으면 다른 앱 알림도 위치 없이(SKIPPED) 저장한다.
+ * 이 앱이 띄운 테스트 알림([TestNotification])도 대상 알림과 똑같이 처리한다.
  */
 class PaymentNotificationListener : NotificationListenerService() {
 
@@ -32,22 +34,29 @@ class PaymentNotificationListener : NotificationListenerService() {
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         val receivedAt = System.currentTimeMillis()
-        if (sbn.packageName == packageName) return
+        val isTest = sbn.packageName == packageName &&
+            sbn.notification.extras.getBoolean(TestNotification.EXTRA_IS_TEST, false)
+        if (sbn.packageName == packageName && !isTest) return
         // 상태 스냅샷은 지연 없이 수신 시점에 바로 찍는다.
         val state = DeviceStateSnapshot.capture(this)
 
         scope.launch {
             try {
-                handle(sbn, receivedAt, state)
+                handle(sbn, receivedAt, state, isTest)
             } catch (e: Exception) {
                 Log.e(TAG, "failed to record notification ${sbn.key}", e)
             }
         }
     }
 
-    private suspend fun handle(sbn: StatusBarNotification, receivedAt: Long, state: DeviceStateSnapshot) {
+    private suspend fun handle(
+        sbn: StatusBarNotification,
+        receivedAt: Long,
+        state: DeviceStateSnapshot,
+        isTest: Boolean,
+    ) {
         val settings = app.settings.current()
-        val isTarget = settings.isTarget(sbn.packageName)
+        val isTarget = isTest || settings.isTarget(sbn.packageName)
         if (!isTarget && !settings.logAllApps) return
 
         val n = sbn.notification
@@ -58,11 +67,17 @@ class PaymentNotificationListener : NotificationListenerService() {
         val bigText = extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString()
         val textLines = extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)?.joinToString("\n")
 
+        // 테스트 알림: 예약할 때 매장 앞에서 찍은 기준 좌표와 장소 메모가 extras에 실려 온다.
+        val hasRef = isTest && extras.containsKey(TestNotification.EXTRA_REF_LAT)
+        val place = if (isTest) extras.getString(TestNotification.EXTRA_PLACE)?.takeIf { it.isNotBlank() } else null
+
         val parsed = runCatching { TossNotificationParser.parse(title, text, subText, bigText) }.getOrNull()
 
         val dao = app.db.recordDao()
         val id = dao.insert(
             PaymentRecord(
+                isTest = isTest,
+                testScheduledAt = if (isTest) extras.getLong(TestNotification.EXTRA_SCHEDULED_AT).takeIf { it > 0 } else null,
                 packageName = sbn.packageName,
                 notificationKey = sbn.key,
                 postTime = sbn.postTime,
@@ -92,6 +107,16 @@ class PaymentNotificationListener : NotificationListenerService() {
                 deviceIdleMode = state.deviceIdleMode,
                 appImportance = state.appImportance,
                 appImportanceLabel = state.appImportanceLabel,
+                actualStoreName = place,
+                channel = if (isTest) Channel.OFFLINE else Channel.UNKNOWN,
+                refLat = if (hasRef) extras.getDouble(TestNotification.EXTRA_REF_LAT) else null,
+                refLng = if (hasRef) extras.getDouble(TestNotification.EXTRA_REF_LNG) else null,
+                refAccuracyM = if (hasRef && extras.containsKey(TestNotification.EXTRA_REF_ACCURACY)) {
+                    extras.getFloat(TestNotification.EXTRA_REF_ACCURACY)
+                } else {
+                    null
+                },
+                refCapturedAt = if (hasRef) extras.getLong(TestNotification.EXTRA_REF_AT) else null,
             )
         )
         if (!isTarget) return

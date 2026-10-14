@@ -11,6 +11,7 @@ object Routes {
     const val RECORDS = "records"
     const val PERMISSIONS = "permissions"
     const val SETTINGS = "settings"
+    const val TEST = "test"
     const val DETAIL = "detail/{id}"
     fun detail(id: Long) = "detail/$id"
 }
@@ -24,10 +25,12 @@ fun AppNav() {
                 onOpen = { nav.navigate(Routes.detail(it)) },
                 onPermissions = { nav.navigate(Routes.PERMISSIONS) },
                 onSettings = { nav.navigate(Routes.SETTINGS) },
+                onTest = { nav.navigate(Routes.TEST) },
             )
         }
         composable(Routes.PERMISSIONS) { PermissionScreen(onBack = { nav.popBackStack() }) }
         composable(Routes.SETTINGS) { SettingsScreen(onBack = { nav.popBackStack() }) }
+        composable(Routes.TEST) { TestScreen(onBack = { nav.popBackStack() }) }
         composable(
             Routes.DETAIL,
             arguments = listOf(navArgument("id") { type = NavType.LongType }),

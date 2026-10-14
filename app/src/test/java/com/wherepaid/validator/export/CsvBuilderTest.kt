@@ -90,11 +90,23 @@ class CsvBuilderTest {
     }
 
     @Test
+    fun `테스트 알림 컬럼`() {
+        val scheduled = TimeFormat.parse("2026-10-14 15:00:00", kst)!!
+        val r = record(receivedAt = scheduled + 2_000).copy(isTest = true, testScheduledAt = scheduled)
+        val row = parseRow(CsvBuilder.build(listOf(r), "철수", kst), 1)
+        assertEquals("true", row["is_test"])
+        assertEquals("2026-10-14 15:00:00", row["test_scheduled_at"])
+        assertEquals("2.000", row["test_alarm_delay_sec"])
+    }
+
+    @Test
     fun `수동 입력이 없으면 빈 칸`() {
         val row = parseRow(CsvBuilder.build(listOf(record(receivedAt = 1_000_000)), "영희", kst), 1)
         assertEquals("", row["notif_delay_sec"])
         assertEquals("", row["distance_m"])
         assertEquals("", row["within_100m"])
+        assertEquals("false", row["is_test"])
+        assertEquals("", row["test_alarm_delay_sec"])
     }
 
     @Test
