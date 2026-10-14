@@ -19,6 +19,9 @@ object CsvBuilder {
         Col("member") { member },
         Col("id") { it.id },
         Col("package") { it.packageName },
+        Col("is_test") { it.isTest },
+        Col("test_scheduled_at") { TimeFormat.format(it.testScheduledAt, zone) },
+        Col("test_alarm_delay_sec") { testAlarmDelaySec(it) },
         Col("notification_key") { it.notificationKey },
         Col("post_time_ms") { it.postTime },
         Col("post_time") { TimeFormat.format(it.postTime, zone) },
@@ -87,6 +90,10 @@ object CsvBuilder {
     /** postTime − 실제 결제 시각 (초). */
     fun postDelaySec(r: PaymentRecord): String? =
         r.actualPaidAt?.let { fmt3((r.postTime - it) / 1000.0) }
+
+    /** 테스트 알림: 예약 시각 대비 실제 수신이 얼마나 늦었는지 (초). 절전/알람 제한 확인용. */
+    fun testAlarmDelaySec(r: PaymentRecord): String? =
+        r.testScheduledAt?.let { fmt3((r.receivedAt - it) / 1000.0) }
 
     /** 알림 수신 좌표 ↔ 매장 앞 기준 좌표 거리. */
     fun distanceRaw(r: PaymentRecord): Double? =

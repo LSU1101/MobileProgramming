@@ -45,12 +45,17 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun RecordListScreen(onOpen: (Long) -> Unit, onPermissions: () -> Unit, onSettings: () -> Unit) {
+fun RecordListScreen(
+    onOpen: (Long) -> Unit,
+    onPermissions: () -> Unit,
+    onSettings: () -> Unit,
+    onTest: () -> Unit,
+) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     val all by remember { ctx.app.db.recordDao().observeAll() }.collectAsStateWithLifecycle(emptyList())
     val settings by remember { ctx.app.settings.flow }.collectAsStateWithLifecycle(Settings())
-    var targetOnly by rememberSaveable { mutableStateOf(true) }
+    var filter by rememberSaveable { mutableStateOf(Filter.REAL) }
     var exporting by remember { mutableStateOf(false) }
 
     var missingPermission by remember { mutableStateOf(false) }
@@ -58,14 +63,20 @@ fun RecordListScreen(onOpen: (Long) -> Unit, onPermissions: () -> Unit, onSettin
         missingPermission = !Permissions.hasNotificationAccess(ctx) || !Permissions.hasBackground(ctx)
     }
 
-    val shown = if (targetOnly) all.filter { settings.isTarget(it.packageName) } else all
-    val targets = all.filter { settings.isTarget(it.packageName) }
+    val real = all.filter { !it.isTest && settings.isTarget(it.packageName) }
+    val tests = all.filter { it.isTest }
+    val shown = when (filter) {
+        Filter.REAL -> real
+        Filter.TEST -> tests
+        Filter.ALL -> all
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("결제 알림 기록") },
+                title = { Text("기록") },
                 actions = {
+                    TextButton(onClick = onTest) { Text("테스트") }
                     TextButton(onClick = onPermissions) { Text("권한") }
                     TextButton(onClick = onSettings) { Text("설정") }
                     TextButton(
@@ -100,25 +111,32 @@ fun RecordListScreen(onOpen: (Long) -> Unit, onPermissions: () -> Unit, onSettin
                     )
                 }
             }
-            Summary(targets)
             Row(Modifier.padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(selected = targetOnly, onClick = { targetOnly = true }, label = { Text("대상 앱만") })
-                FilterChip(selected = !targetOnly, onClick = { targetOnly = false }, label = { Text("전체 (${all.size})") })
+                FilterChip(selected = filter == Filter.REAL, onClick = { filter = Filter.REAL }, label = { Text("실결제 (${real.size})") })
+                FilterChip(selected = filter == Filter.TEST, onClick = { filter = Filter.TEST }, label = { Text("테스트 (${tests.size})") })
+                FilterChip(selected = filter == Filter.ALL, onClick = { filter = Filter.ALL }, label = { Text("전체 (${all.size})") })
             }
+            if (filter != Filter.ALL) Summary(shown)
             if (shown.isEmpty()) {
                 Text(
-                    "아직 기록이 없습니다.\n권한을 모두 허용한 뒤 토스로 결제해 보세요.",
+                    if (filter == Filter.TEST) {
+                        "테스트 기록이 없습니다.\n상단 '테스트'에서 테스트 알림을 예약해 보세요."
+                    } else {
+                        "아직 기록이 없습니다.\n권한을 모두 허용한 뒤 토스로 결제해 보세요."
+                    },
                     Modifier.padding(24.dp),
                 )
             }
             LazyColumn(Modifier.fillMaxSize()) {
                 items(shown, key = { it.id }) { r ->
-                    RecordRow(r, isTarget = settings.isTarget(r.packageName), onClick = { onOpen(r.id) })
+                    RecordRow(r, isTarget = r.isTest || settings.isTarget(r.packageName), onClick = { onOpen(r.id) })
                 }
             }
         }
     }
 }
+
+private enum class Filter { REAL, TEST, ALL }
 
 /** 팀 목표(40건) 진행 상황을 한눈에. */
 @Composable
@@ -128,7 +146,7 @@ private fun Summary(targets: List<PaymentRecord>) {
     val within = targets.count { (CsvBuilder.distanceRaw(it) ?: Double.MAX_VALUE) <= CsvBuilder.WITHIN_METERS }
     val manual = targets.count { it.actualPaidAt != null }
     Text(
-        "대상 알림 ${targets.size}건 · 위치 성공 $success · 실제시각 입력 $manual · 거리 계산 $withRef · 100m 이내 $within",
+        "${targets.size}건 · 위치 성공 $success · 실제시각 입력 $manual · 거리 계산 $withRef · 100m 이내 $within",
         style = MaterialTheme.typography.bodySmall,
         modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
     )
@@ -146,11 +164,12 @@ private fun RecordRow(r: PaymentRecord, isTarget: Boolean, onClick: () -> Unit) 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(TimeFormat.formatShort(r.receivedAt), style = MaterialTheme.typography.bodySmall)
             if (!isTarget) Text(r.packageName, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+            if (r.isTest) Text("[테스트]", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
             if (r.actualPaidAt != null) Text("✔입력됨", style = MaterialTheme.typography.bodySmall)
         }
         if (isTarget) {
             val cancel = if (r.parsedIsCancel == true) " [취소]" else ""
-            Text("${amountText(r.parsedAmount)} · ${r.parsedMerchant ?: r.subText ?: r.text ?: "?"}$cancel")
+            Text("${amountText(r.parsedAmount)} · ${r.actualStoreName ?: r.parsedMerchant ?: r.subText ?: r.text ?: "?"}$cancel")
         } else {
             Text("${r.title ?: ""} · ${r.text ?: ""}", maxLines = 1)
         }

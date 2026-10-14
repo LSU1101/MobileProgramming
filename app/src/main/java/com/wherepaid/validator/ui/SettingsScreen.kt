@@ -55,6 +55,7 @@ fun SettingsScreen(onBack: () -> Unit) {
         }
     }
     var confirmCleanup by remember { mutableStateOf(false) }
+    var confirmDeleteTests by remember { mutableStateOf(false) }
 
     Scaffold(topBar = { BackTopBar("설정", onBack) }) { padding ->
         val s = settings ?: return@Scaffold
@@ -114,7 +115,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                             style = MaterialTheme.typography.bodySmall,
                         )
                     }
-                    if (!s.isTarget(p.packageName)) {
+                    if (!s.isTarget(p.packageName) && p.packageName != ctx.packageName) {
                         TextButton(onClick = {
                             val merged = (s.targetPackages + p.packageName).joinToString(",")
                             targets = merged
@@ -126,6 +127,7 @@ fun SettingsScreen(onBack: () -> Unit) {
 
             SectionTitle("정리")
             OutlinedButton(onClick = { confirmCleanup = true }) { Text("대상 앱이 아닌 기록 모두 삭제") }
+            OutlinedButton(onClick = { confirmDeleteTests = true }) { Text("테스트 기록 모두 삭제") }
         }
     }
 
@@ -133,7 +135,7 @@ fun SettingsScreen(onBack: () -> Unit) {
         AlertDialog(
             onDismissRequest = { confirmCleanup = false },
             title = { Text("기록 삭제") },
-            text = { Text("대상 패키지가 아닌 앱의 기록을 모두 삭제합니다. 되돌릴 수 없습니다.") },
+            text = { Text("대상 패키지가 아닌 앱의 기록을 모두 삭제합니다(테스트 기록은 유지). 되돌릴 수 없습니다.") },
             confirmButton = {
                 TextButton(onClick = {
                     confirmCleanup = false
@@ -145,6 +147,24 @@ fun SettingsScreen(onBack: () -> Unit) {
                 }) { Text("삭제") }
             },
             dismissButton = { TextButton(onClick = { confirmCleanup = false }) { Text("취소") } },
+        )
+    }
+
+    if (confirmDeleteTests) {
+        AlertDialog(
+            onDismissRequest = { confirmDeleteTests = false },
+            title = { Text("테스트 기록 삭제") },
+            text = { Text("테스트 알림 기록을 모두 삭제합니다. 필요하면 먼저 CSV를 내보내세요. 되돌릴 수 없습니다.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmDeleteTests = false
+                    scope.launch {
+                        val n = ctx.app.db.recordDao().deleteTests()
+                        Toast.makeText(ctx, "${n}건 삭제", Toast.LENGTH_SHORT).show()
+                    }
+                }) { Text("삭제") }
+            },
+            dismissButton = { TextButton(onClick = { confirmDeleteTests = false }) { Text("취소") } },
         )
     }
 }

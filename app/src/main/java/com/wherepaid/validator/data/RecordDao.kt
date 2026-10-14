@@ -67,6 +67,10 @@ interface RecordDao {
     @Query("DELETE FROM payment_record WHERE id = :id")
     suspend fun delete(id: Long)
 
-    @Query("DELETE FROM payment_record WHERE packageName NOT IN (:packages)")
+    /** 대상 앱이 아닌 일반 알림 기록 삭제 (테스트 기록은 남긴다) */
+    @Query("DELETE FROM payment_record WHERE packageName NOT IN (:packages) AND isTest = 0")
     suspend fun deleteNotIn(packages: List<String>): Int
+
+    @Query("DELETE FROM payment_record WHERE isTest = 1")
+    suspend fun deleteTests(): Int
 }
