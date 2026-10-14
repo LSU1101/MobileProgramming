@@ -21,7 +21,7 @@ package com.wherepaid.validator.parse
 object TossNotificationParser {
 
     /** 규칙을 바꾸면 올린다. 레코드마다 저장되어 어떤 규칙으로 파싱했는지 추적할 수 있다. */
-    const val VERSION = 3
+    const val VERSION = 4
 
     // ---------------------------------------------------------------------
     // 규칙
@@ -42,8 +42,13 @@ object TossNotificationParser {
     /** 결제 줄 없이 이 단어가 있으면 포인트/혜택 알림. ("보너스 포인트 적립 가능"은 결제 줄이 같이 있어 결제로 남는다) */
     private val POINT_KEYWORDS = listOf("적립", "캐시백", "받았어요", "혜택으로")
 
-    /** 결제수단(카드)과 가맹점을 나누는 구분자: "하나체크 | Adobe", "토스페이머니 · 구글페이먼트코리아" */
-    private val CARD_MERCHANT_SEPARATOR = Regex("""\s*[|·•ㆍ]\s*""")
+    /**
+     * 결제수단(카드)과 가맹점을 나누는 구분자: "하나체크 | Adobe", "토스페이머니 · 구글페이먼트코리아".
+     * 가운뎃점은 화면에서 같아 보여도 코드가 여러 가지라 비슷한 문자를 모두 받는다:
+     * | ｜ · • ∙ ⋅ ・ ･ ‧ ㆍ
+     */
+    private val CARD_MERCHANT_SEPARATOR =
+        Regex("""\s*[|\uFF5C\u00B7\u2022\u2219\u22C5\u30FB\uFF65\u2027\u318D]\s*""")
 
     /** 가맹점 끝의 결제방식 괄호: "(일시불)", "(할부 3개월)", "(3개월)". 맨 끝 괄호만 본다. */
     private val PAY_TYPE_SUFFIX = Regex("""\(\s*(일시불|할부[^()]*|\d+\s*개월[^()]*)\s*\)\s*$""")

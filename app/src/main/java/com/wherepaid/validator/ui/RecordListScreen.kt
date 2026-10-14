@@ -176,6 +176,9 @@ private fun RecordRow(r: PaymentRecord, isTarget: Boolean, onClick: () -> Unit) 
         if (isTarget) {
             val cancel = if (r.parsedIsCancel == true) " [취소]" else ""
             Text("${amountText(r.parsedAmount)} · ${r.actualStoreName ?: r.parsedMerchant ?: r.subText ?: r.text ?: "?"}$cancel")
+            r.parsedCardName?.let {
+                Text(it + (r.parsedPayType?.let { t -> " · $t" } ?: ""), style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+            }
         } else {
             Text("${r.title ?: ""} · ${r.text ?: ""}", maxLines = 1)
         }
