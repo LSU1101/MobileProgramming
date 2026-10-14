@@ -4,17 +4,20 @@ package com.wherepaid.validator.parse
  * 토스 결제 알림 파서 (참고용).
  *
  * 파싱 규칙은 모두 이 파일에 모아 둔다. 실제 알림 형식이 예상과 다르면 아래 "규칙" 영역만 고치고
- * [VERSION]을 올리면 된다. 파싱이 실패해도 원본 알림은 항상 DB에 남는다.
+ * [VERSION]을 올리면 된다. 앱이 시작될 때 이전 버전으로 파싱된 기록을 다시 파싱한다.
+ * 파싱이 실패해도 원본 알림은 항상 DB에 남는다.
  *
- * 기준 예시:
- *   title   = "카드 알림 받기"
- *   text    = "26,400원 결제"
- *   subText = "하나체크 | Adobe(일시불)"
+ * 확인된 형식:
+ *  - 카드 알림 (예시)   title="카드 알림 받기"      text="26,400원 결제"
+ *                        subText="하나체크 | Adobe(일시불)"
+ *  - 토스페이 결제       title="17,000원 결제 완료"
+ *                        text="토스페이머니 · 구글페이먼트코리아 유한회사" (+ "보너스 포인트 적립 가능")
+ *  - 토스페이 포인트 적립 title="포인트 적립"         text="토스페이 결제 혜택으로 14원 받았어요"
  */
 object TossNotificationParser {
 
     /** 규칙을 바꾸면 올린다. 레코드마다 저장되어 어떤 규칙으로 파싱했는지 추적할 수 있다. */
-    const val VERSION = 1
+    const val VERSION = 2
 
     // ---------------------------------------------------------------------
     // 규칙
@@ -23,14 +26,17 @@ object TossNotificationParser {
     /** 금액: "26,400원" → 26400. 숫자와 쉼표 뒤에 "원". */
     private val AMOUNT = Regex("""(\d[\d,]*)\s*원""")
 
-    /** 이 단어가 제목/본문에 있으면 취소 알림으로 본다. */
+    /** 결제 줄: "17,000원 결제 완료", "26,400원 결제", "5,000원 승인". 이 줄이 있어야 결제/취소로 본다. */
+    private val PAYMENT_LINE = Regex("""(\d[\d,]*)\s*원\s*(결제|승인|사용)""")
+
+    /** 이 단어가 있으면 취소 알림. */
     private val CANCEL_KEYWORDS = listOf("취소", "환불")
 
-    /** 이 단어가 있으면 (취소 단어가 없을 때) 일반 결제로 본다. */
-    private val PAYMENT_KEYWORDS = listOf("결제", "승인", "사용")
+    /** 결제 줄 없이 이 단어가 있으면 포인트/혜택 알림. ("보너스 포인트 적립 가능"은 결제 줄이 같이 있어 결제로 남는다) */
+    private val POINT_KEYWORDS = listOf("적립", "캐시백", "받았어요", "혜택으로")
 
-    /** 보조 텍스트에서 카드명과 가맹점을 나누는 구분자. "하나체크 | Adobe(일시불)" */
-    private const val CARD_MERCHANT_SEPARATOR = '|'
+    /** 결제수단(카드)과 가맹점을 나누는 구분자: "하나체크 | Adobe", "토스페이머니 · 구글페이먼트코리아" */
+    private val CARD_MERCHANT_SEPARATOR = Regex("""\s*[|·•ㆍ]\s*""")
 
     /** 가맹점 끝의 결제방식 괄호: "(일시불)", "(할부 3개월)", "(3개월)". 맨 끝 괄호만 본다. */
     private val PAY_TYPE_SUFFIX = Regex("""\(\s*(일시불|할부[^()]*|\d+\s*개월[^()]*)\s*\)\s*$""")
@@ -38,13 +44,38 @@ object TossNotificationParser {
     // ---------------------------------------------------------------------
 
     fun parse(title: String?, text: String?, subText: String?, bigText: String?): ParsedPayment {
-        val bodies = listOfNotNull(text, bigText, title)
+        // 필드마다 어떤 줄이 들어오는지 앱/OS마다 달라서, 모든 필드의 모든 줄을 한꺼번에 본다.
+        val lines = listOfNotNull(title, text, subText, bigText)
+            .flatMap { it.lines() }
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .distinct()
+
+        val paymentLine = lines.firstOrNull { PAYMENT_LINE.containsMatchIn(it) }
+        val kind = classify(lines, paymentLine != null)
+        val amount = paymentLine?.let(::parseAmount) ?: lines.firstNotNullOfOrNull(::parseAmount)
+        val cardMerchant = if (kind == PaymentKind.PAYMENT || kind == PaymentKind.CANCEL) {
+            lines.filter { !AMOUNT.containsMatchIn(it) }.firstNotNullOfOrNull(::parseCardMerchant)
+        } else {
+            null
+        }
         return ParsedPayment(
-            amount = bodies.firstNotNullOfOrNull(::parseAmount),
-            isCancel = parseIsCancel(bodies),
-            cardMerchant = parseCardMerchant(subText)
-                ?: bigText?.lineSequence()?.firstNotNullOfOrNull(::parseCardMerchant),
+            kind = kind,
+            amount = amount,
+            isCancel = when (kind) {
+                PaymentKind.CANCEL -> true
+                PaymentKind.PAYMENT -> false
+                else -> null
+            },
+            cardMerchant = cardMerchant,
         )
+    }
+
+    internal fun classify(lines: List<String>, hasPaymentLine: Boolean): PaymentKind = when {
+        lines.any { l -> CANCEL_KEYWORDS.any { it in l } } && lines.any { AMOUNT.containsMatchIn(it) } -> PaymentKind.CANCEL
+        hasPaymentLine -> PaymentKind.PAYMENT
+        lines.any { l -> POINT_KEYWORDS.any { it in l } } -> PaymentKind.POINT
+        else -> PaymentKind.OTHER
     }
 
     internal fun parseAmount(s: String): Long? {
@@ -52,19 +83,13 @@ object TossNotificationParser {
         return m.groupValues[1].replace(",", "").toLongOrNull()
     }
 
-    internal fun parseIsCancel(bodies: List<String>): Boolean? {
-        if (bodies.any { b -> CANCEL_KEYWORDS.any { it in b } }) return true
-        if (bodies.any { b -> PAYMENT_KEYWORDS.any { it in b } }) return false
-        return null
-    }
-
     /** "하나체크 | Adobe(일시불)" → (하나체크, Adobe, 일시불). 구분자가 없으면 null. */
     internal fun parseCardMerchant(s: String?): CardMerchant? {
         if (s.isNullOrBlank()) return null
-        val idx = s.indexOf(CARD_MERCHANT_SEPARATOR)
-        if (idx < 0) return null
-        val card = s.substring(0, idx).trim().ifEmpty { null }
-        var rest = s.substring(idx + 1).trim()
+        val parts = s.split(CARD_MERCHANT_SEPARATOR, limit = 2)
+        if (parts.size < 2) return null
+        val card = parts[0].trim().ifEmpty { null }
+        var rest = parts[1].trim()
         var payType: String? = null
         PAY_TYPE_SUFFIX.find(rest)?.let { m ->
             payType = m.groupValues[1].trim()
@@ -74,9 +99,13 @@ object TossNotificationParser {
     }
 }
 
+/** 알림 종류. 분석에서는 PAYMENT/CANCEL만 실결제로 본다. */
+enum class PaymentKind { PAYMENT, CANCEL, POINT, OTHER }
+
 data class CardMerchant(val cardName: String?, val merchant: String?, val payType: String?)
 
 data class ParsedPayment(
+    val kind: PaymentKind,
     val amount: Long?,
     val isCancel: Boolean?,
     private val cardMerchant: CardMerchant?,

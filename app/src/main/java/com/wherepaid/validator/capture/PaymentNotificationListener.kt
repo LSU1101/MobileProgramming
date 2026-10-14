@@ -37,6 +37,9 @@ class PaymentNotificationListener : NotificationListenerService() {
         val isTest = sbn.packageName == packageName &&
             sbn.notification.extras.getBoolean(TestNotification.EXTRA_IS_TEST, false)
         if (sbn.packageName == packageName && !isTest) return
+        // 진행 중 알림(토스 만보기 Live Activity, 음악 재생 등)은 상태가 바뀔 때마다 다시 올라와
+        // 기록과 위치 요청이 폭주한다. 결제 알림은 진행 중 알림이 아니므로 통째로 무시한다.
+        if (sbn.isOngoing) return
         // 상태 스냅샷은 지연 없이 수신 시점에 바로 찍는다.
         val state = DeviceStateSnapshot.capture(this)
 
@@ -58,6 +61,9 @@ class PaymentNotificationListener : NotificationListenerService() {
         val settings = app.settings.current()
         val isTarget = isTest || settings.isTarget(sbn.packageName)
         if (!isTarget && !settings.logAllApps) return
+        // 그룹 요약 알림은 개별 알림과 함께 오는 묶음 표시라 내용이 없다. 기록은 하되 위치는 재지 않는다.
+        val isGroupSummary = (sbn.notification.flags and Notification.FLAG_GROUP_SUMMARY) != 0
+        val measureLocation = isTarget && !isGroupSummary
 
         val n = sbn.notification
         val extras = n.extras
@@ -88,7 +94,7 @@ class PaymentNotificationListener : NotificationListenerService() {
                 bigText = bigText,
                 textLines = textLines,
                 category = n.category,
-                isGroupSummary = (n.flags and Notification.FLAG_GROUP_SUMMARY) != 0,
+                isGroupSummary = isGroupSummary,
                 isOngoing = sbn.isOngoing,
                 extrasDump = dumpExtras(extras),
                 parsedAmount = parsed?.amount,
@@ -96,8 +102,10 @@ class PaymentNotificationListener : NotificationListenerService() {
                 parsedMerchant = parsed?.merchant,
                 parsedPayType = parsed?.payType,
                 parsedIsCancel = parsed?.isCancel,
+                parsedKind = parsed?.kind,
                 parserVersion = TossNotificationParser.VERSION,
-                locStatus = if (isTarget) LocStatus.PENDING else LocStatus.SKIPPED,
+                locStatus = if (measureLocation) LocStatus.PENDING else LocStatus.SKIPPED,
+                appVersion = app.appVersion,
                 permFine = state.permFine,
                 permCoarse = state.permCoarse,
                 permBackground = state.permBackground,
@@ -119,7 +127,7 @@ class PaymentNotificationListener : NotificationListenerService() {
                 refCapturedAt = if (hasRef) extras.getLong(TestNotification.EXTRA_REF_AT) else null,
             )
         )
-        if (!isTarget) return
+        if (!measureLocation) return
 
         val r = app.locationCapturer.captureForNotification(state)
         dao.updateLocation(

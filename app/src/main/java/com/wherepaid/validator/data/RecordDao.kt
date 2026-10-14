@@ -3,6 +3,7 @@ package com.wherepaid.validator.data
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
+import com.wherepaid.validator.parse.PaymentKind
 import kotlinx.coroutines.flow.Flow
 
 data class PackageCount(val packageName: String, val count: Int, val lastReceivedAt: Long)
@@ -63,6 +64,20 @@ interface RecordDao {
             "WHERE locStatus = 'PENDING' AND receivedAt < :processStartedAt"
     )
     suspend fun markPendingInterrupted(processStartedAt: Long): Int
+
+    /** 파서 규칙이 바뀐 뒤 다시 파싱할 기록 */
+    @Query("SELECT * FROM payment_record WHERE parserVersion IS NULL OR parserVersion < :version")
+    suspend fun getParsedBefore(version: Int): List<PaymentRecord>
+
+    @Query(
+        """UPDATE payment_record SET parsedKind = :kind, parsedAmount = :amount, parsedCardName = :cardName,
+           parsedMerchant = :merchant, parsedPayType = :payType, parsedIsCancel = :isCancel,
+           parserVersion = :version WHERE id = :id"""
+    )
+    suspend fun updateParsed(
+        id: Long, kind: PaymentKind?, amount: Long?, cardName: String?, merchant: String?,
+        payType: String?, isCancel: Boolean?, version: Int,
+    )
 
     @Query("DELETE FROM payment_record WHERE id = :id")
     suspend fun delete(id: Long)

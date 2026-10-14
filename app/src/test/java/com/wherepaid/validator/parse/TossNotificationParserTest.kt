@@ -21,6 +21,62 @@ class TossNotificationParserTest {
         assertEquals("Adobe", p.merchant)
         assertEquals("일시불", p.payType)
         assertEquals(false, p.isCancel)
+        assertEquals(PaymentKind.PAYMENT, p.kind)
+    }
+
+    // --- 실제 토스페이 알림 (2026-10-14 팀원 기기에서 수집) ---
+
+    @Test
+    fun `토스페이 결제 - 금액은 제목, 가맹점은 가운뎃점 구분`() {
+        val p = TossNotificationParser.parse(
+            title = "17,000원 결제 완료",
+            text = "토스페이머니 · 구글페이먼트코리아 유한회사",
+            subText = null,
+            bigText = "토스페이머니 · 구글페이먼트코리아 유한회사\n보너스 포인트 적립 가능",
+        )
+        assertEquals(PaymentKind.PAYMENT, p.kind)
+        assertEquals(17_000L, p.amount)
+        assertEquals("토스페이머니", p.cardName)
+        assertEquals("구글페이먼트코리아 유한회사", p.merchant)
+        assertNull(p.payType)
+        assertEquals(false, p.isCancel)
+    }
+
+    @Test
+    fun `토스페이 결제 - 부가 문구가 본문에 같이 있어도 결제로 판정`() {
+        val p = TossNotificationParser.parse(
+            "15,000원 결제 완료",
+            "토스페이머니 · 구글페이먼트코리아 유한회사\n보너스 포인트 적립 가능",
+            null,
+            null,
+        )
+        assertEquals(PaymentKind.PAYMENT, p.kind)
+        assertEquals(15_000L, p.amount)
+        assertEquals("구글페이먼트코리아 유한회사", p.merchant)
+    }
+
+    @Test
+    fun `토스페이 포인트 적립은 결제가 아님`() {
+        val p = TossNotificationParser.parse("포인트 적립", "토스페이 결제 혜택으로 14원 받았어요", null, null)
+        assertEquals(PaymentKind.POINT, p.kind)
+        assertEquals(14L, p.amount)
+        assertNull(p.isCancel)
+        assertNull(p.merchant)
+    }
+
+    @Test
+    fun `만보기처럼 금액 없는 알림은 OTHER`() {
+        val p = TossNotificationParser.parse("만보기", "6 걸음", null, null)
+        assertEquals(PaymentKind.OTHER, p.kind)
+        assertNull(p.amount)
+    }
+
+    @Test
+    fun `토스페이 결제 취소`() {
+        val p = TossNotificationParser.parse("17,000원 결제 취소", "토스페이머니 · 구글페이먼트코리아 유한회사", null, null)
+        assertEquals(PaymentKind.CANCEL, p.kind)
+        assertEquals(true, p.isCancel)
+        assertEquals("구글페이먼트코리아 유한회사", p.merchant)
     }
 
     @Test
@@ -28,6 +84,7 @@ class TossNotificationParserTest {
         val p = TossNotificationParser.parse("카드 알림 받기", "26,400원 결제 취소", "하나체크 | Adobe(일시불)", null)
         assertEquals(26_400L, p.amount)
         assertEquals(true, p.isCancel)
+        assertEquals(PaymentKind.CANCEL, p.kind)
     }
 
     @Test
@@ -92,6 +149,7 @@ class TossNotificationParserTest {
         assertNull(p.amount)
         assertNull(p.merchant)
         assertNull(p.isCancel)
-        assertTrue(TossNotificationParser.VERSION >= 1)
+        assertEquals(PaymentKind.OTHER, p.kind)
+        assertTrue(TossNotificationParser.VERSION >= 2)
     }
 }
