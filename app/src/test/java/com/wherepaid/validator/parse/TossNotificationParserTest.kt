@@ -43,6 +43,22 @@ class TossNotificationParserTest {
     }
 
     @Test
+    fun `토스페이 결제 - 생김새가 비슷한 가운뎃점 문자도 구분자로 인식`() {
+        // 화면에서는 같아 보이지만 코드가 다른 문자들: · • ∙ ⋅ ・ ･ ‧ ㆍ | ｜
+        val dots = listOf("\u00B7", "\u2022", "\u2219", "\u22C5", "\u30FB", "\uFF65", "\u2027", "\u318D", "|", "\uFF5C")
+        for (dot in dots) {
+            val p = TossNotificationParser.parse(
+                "17,000원 결제 완료",
+                "토스페이머니 $dot 구글페이먼트코리아 유한회사\n보너스 포인트 적립 가능",
+                null,
+                null,
+            )
+            assertEquals("separator U+%04X".format(dot[0].code), "토스페이머니", p.cardName)
+            assertEquals("separator U+%04X".format(dot[0].code), "구글페이먼트코리아 유한회사", p.merchant)
+        }
+    }
+
+    @Test
     fun `토스페이 결제 - 부가 문구가 본문에 같이 있어도 결제로 판정`() {
         val p = TossNotificationParser.parse(
             "15,000원 결제 완료",
