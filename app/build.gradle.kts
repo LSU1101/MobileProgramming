@@ -15,8 +15,21 @@ android {
         applicationId = "com.wherepaid.validator"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
+        // CI에서 빌드 번호로 덮어쓴다 (.github/workflows/android.yml)
+        versionCode = System.getenv("VERSION_CODE")?.toIntOrNull() ?: 1
+        versionName = System.getenv("VERSION_NAME") ?: "0.1.0"
+    }
+
+    signingConfigs {
+        // 팀 공용 debug 키. 누가 어디서 빌드해도 서명이 같아서 앱을 지우지 않고 업데이트할 수 있다.
+        // Play 배포용 키가 아니므로 저장소에 둬도 된다.
+        getByName("debug") {
+            storeFile = file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+            storeType = "pkcs12"
+        }
     }
 
     buildTypes {

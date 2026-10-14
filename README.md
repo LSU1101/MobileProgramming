@@ -8,7 +8,27 @@
 
 ---
 
-## 1. APK 빌드
+## 0. APK 받기 (팀원은 여기만 보면 됩니다)
+
+폰 브라우저에서 아래 링크를 열면 최신 APK가 내려받아집니다. 설치는 [2. 폰에 설치](#2-폰에-설치)의 방법 2를 따르세요.
+
+**https://github.com/LSU1101/MobileProgramming/releases/latest/download/app-debug.apk**
+
+- 지난 버전은 [Releases](https://github.com/LSU1101/MobileProgramming/releases) 페이지에 있습니다.
+- 저장소가 비공개라면 GitHub에 로그인한 상태여야 받을 수 있습니다.
+
+### 새 버전 배포하기 (Android Studio 불필요)
+APK는 GitHub Actions가 빌드합니다. 아래 둘 중 하나를 하면 몇 분 뒤 Release에 새 APK가 올라갑니다.
+- **버튼으로:** 저장소 → **Actions** → 왼쪽 **Android** → **Run workflow** (`main` 선택) → 실행
+- **태그로:** `git tag v0.2.0 && git push origin v0.2.0`
+
+빌드할 때마다 versionCode가 올라가고, 모든 빌드가 저장소의 공용 debug 키(`app/debug.keystore`)로 서명됩니다. 그래서 새 APK를 **기존 앱 위에 그대로 덮어 설치**할 수 있고 데이터도 유지됩니다.
+
+`main`에 푸시하거나 PR을 올릴 때도 같은 워크플로가 단위 테스트와 APK 빌드를 검사합니다. 이때는 Release를 만들지 않습니다.
+
+---
+
+## 1. APK 직접 빌드 (개발자용)
 
 ### 준비물
 - **Android Studio** 최신 안정 버전 (JDK 17 이상 포함)
@@ -54,7 +74,7 @@ Windows에서는 `gradlew.bat assembleDebug`를 사용합니다.
    - 그 다음 앱의 권한 화면에서 알림 접근을 켭니다.
    - `adb install`로 설치하면 이 단계가 필요 없습니다.
 
-> **한 사람이 빌드한 APK 하나를 4명이 같이 쓰는 것을 권장합니다.** debug APK는 빌드한 PC마다 서명 키가 다릅니다. 같은 APK를 써야 업데이트(재설치)할 때 데이터가 유지됩니다. 서명 키가 다른 APK로 덮어쓰려면 기존 앱을 삭제해야 하고, **삭제하면 데이터도 사라집니다.** 재설치 전에 반드시 CSV를 먼저 내보내세요.
+> 모든 빌드(로컬, CI)가 저장소의 공용 debug 키로 서명되므로 새 버전을 덮어 설치해도 데이터가 유지됩니다. 단, **앱을 삭제하면 데이터가 사라지니** 재설치나 삭제 전에는 반드시 CSV를 먼저 내보내세요.
 
 ---
 
