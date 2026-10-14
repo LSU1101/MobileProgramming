@@ -72,6 +72,30 @@ class TossNotificationParserTest {
         assertEquals(false, p.isCancel)
     }
 
+    // --- 토스 "카드 알림 받기"로 받은 타 카드사 알림 (2026-10-14 실기기) ---
+
+    @Test
+    fun `타 카드사 결제 - 금액은 제목, 카드와 가맹점은 본문`() {
+        val p = TossNotificationParser.parse("20,000원 결제", "하나체크 | 네이버페이(일시불)", null, null)
+        assertEquals(PaymentKind.PAYMENT, p.kind)
+        assertEquals(20_000L, p.amount)
+        assertEquals("하나체크", p.cardName)
+        assertEquals("네이버페이", p.merchant)
+        assertEquals("일시불", p.payType)
+        assertEquals(false, p.isCancel)
+    }
+
+    @Test
+    fun `타 카드사 결제 취소`() {
+        val p = TossNotificationParser.parse("20,000원 결제 취소", "하나체크 | 네이버페이(일시불)", null, null)
+        assertEquals(PaymentKind.CANCEL, p.kind)
+        assertEquals(20_000L, p.amount)
+        assertEquals("하나체크", p.cardName)
+        assertEquals("네이버페이", p.merchant)
+        assertEquals("일시불", p.payType)
+        assertEquals(true, p.isCancel)
+    }
+
     @Test
     fun `결제 줄이 없어도 잔액은 금액으로 쓰지 않는다`() {
         val p = TossNotificationParser.parse("토스뱅크", "입출금 알림\n잔액 740,300원", null, null)
