@@ -149,7 +149,7 @@ Windows에서는 `gradlew.bat assembleDebug`를 사용합니다.
 | `accuracy_m`, `loc_elapsed_ms`, `loc_fix_age_ms` | 정확도, 획득 소요 시간, 좌표의 신선도 |
 | `perm_background`, `app_importance_label`, `battery_opt_ignored`, `device_idle_mode` | 수신 시점의 권한과 앱·전원 상태 |
 | `notification_key` | 같은 key가 여러 행이면 같은 알림이 중복 또는 업데이트로 수신된 것 |
-| `parsed_kind` | 알림 종류: `PAYMENT`(결제), `CANCEL`(취소), `POINT`(포인트 적립), `OTHER`(기타). **분석은 PAYMENT, CANCEL만** 사용 |
+| `parsed_kind` | 알림 종류: `PAYMENT`(결제), `CANCEL`(취소), `FAILED`(결제 실패: 잔액 부족, 승인 거절 등), `POINT`(포인트 적립), `OTHER`(기타). **결제 분석은 PAYMENT, CANCEL만** 사용. FAILED는 돈이 나가지 않았지만 매장에서 결제를 시도한 기록이라 위치 검증에는 쓸 수 있음 |
 | `app_version` | 기록한 앱 버전 `versionName(versionCode)`. 측정 방식이 바뀐 빌드 전후 데이터를 나눌 때 사용 |
 
 ### 위치 실패 원인 (`loc_fail_reason`)
