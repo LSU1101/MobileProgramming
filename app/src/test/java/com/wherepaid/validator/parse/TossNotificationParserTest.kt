@@ -112,6 +112,30 @@ class TossNotificationParserTest {
         assertEquals(true, p.isCancel)
     }
 
+    // --- 결제 실패 (2026-10-23 실기기, 기록 #225: 잔액 부족) ---
+
+    @Test
+    fun `결제 실패는 결제가 아님`() {
+        val body = "우리체크 | 맘스터치(일시불)"
+        val p = TossNotificationParser.parse("2,500원 결제 실패", body, null, body)
+        assertEquals(PaymentKind.FAILED, p.kind)
+        assertEquals(2_500L, p.amount)
+        assertEquals("우리체크", p.cardName)
+        assertEquals("맘스터치", p.merchant)
+        assertNull(p.isCancel)
+    }
+
+    @Test
+    fun `승인 거절과 잔액 부족 문구도 실패로 판정`() {
+        for ((title, text) in listOf(
+            "2,500원 승인 거절" to "우리체크 | 맘스터치(일시불)",
+            "2,500원 결제" to "우리체크 | 맘스터치(일시불)\n잔액부족으로 승인되지 않았어요",
+            "2,500원 결제 승인거절" to "우리체크 | 맘스터치(일시불)",
+        )) {
+            assertEquals(title, PaymentKind.FAILED, TossNotificationParser.parse(title, text, null, null).kind)
+        }
+    }
+
     @Test
     fun `결제 줄이 없어도 잔액은 금액으로 쓰지 않는다`() {
         val p = TossNotificationParser.parse("토스뱅크", "입출금 알림\n잔액 740,300원", null, null)

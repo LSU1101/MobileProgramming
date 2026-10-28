@@ -15,13 +15,14 @@ package com.wherepaid.validator.parse
  *  - 토스페이 결제       title="17,000원 결제 완료"
  *                        text="토스페이머니 · 구글페이먼트코리아 유한회사" (+ "보너스 포인트 적립 가능")
  *  - 토스페이 포인트 적립 title="포인트 적립"         text="토스페이 결제 혜택으로 14원 받았어요"
+ *  - 결제 실패 (실기기)  title="2,500원 결제 실패"      text="우리체크 | 맘스터치(일시불)" (잔액 부족)
  *  - 토스뱅크 체크카드   title="10,000원 결제"        subText="토스뱅크"
  *                        text="토스뱅크 체크카드 | 한성대학교산학협력단 케이키친한\n잔액 740,300원"
  */
 object TossNotificationParser {
 
     /** 규칙을 바꾸면 올린다. 레코드마다 저장되어 어떤 규칙으로 파싱했는지 추적할 수 있다. */
-    const val VERSION = 4
+    const val VERSION = 5
 
     // ---------------------------------------------------------------------
     // 규칙
@@ -35,6 +36,9 @@ object TossNotificationParser {
 
     /** 이 단어가 있는 줄의 금액은 결제 금액이 아니다 ("잔액 740,300원"). */
     private val NON_PAYMENT_AMOUNT_KEYWORDS = listOf("잔액", "누적", "한도")
+
+    /** 이 단어가 있으면 결제가 이뤄지지 않은 알림 (잔액 부족, 한도 초과, 승인 거절 등). 취소보다 먼저 본다. */
+    private val FAILED_KEYWORDS = listOf("실패", "거절", "잔액부족", "잔액 부족", "한도초과", "한도 초과", "승인되지 않")
 
     /** 이 단어가 있으면 취소 알림. */
     private val CANCEL_KEYWORDS = listOf("취소", "환불")
@@ -67,7 +71,7 @@ object TossNotificationParser {
         val kind = classify(lines, paymentLine != null)
         val amount = paymentLine?.let(::parseAmount)
             ?: lines.filter { l -> NON_PAYMENT_AMOUNT_KEYWORDS.none { it in l } }.firstNotNullOfOrNull(::parseAmount)
-        val cardMerchant = if (kind == PaymentKind.PAYMENT || kind == PaymentKind.CANCEL) {
+        val cardMerchant = if (kind == PaymentKind.PAYMENT || kind == PaymentKind.CANCEL || kind == PaymentKind.FAILED) {
             lines.filter { !AMOUNT.containsMatchIn(it) }.firstNotNullOfOrNull(::parseCardMerchant)
         } else {
             null
@@ -85,6 +89,7 @@ object TossNotificationParser {
     }
 
     internal fun classify(lines: List<String>, hasPaymentLine: Boolean): PaymentKind = when {
+        lines.any { l -> FAILED_KEYWORDS.any { it in l } } && lines.any { AMOUNT.containsMatchIn(it) } -> PaymentKind.FAILED
         lines.any { l -> CANCEL_KEYWORDS.any { it in l } } && lines.any { AMOUNT.containsMatchIn(it) } -> PaymentKind.CANCEL
         hasPaymentLine -> PaymentKind.PAYMENT
         lines.any { l -> POINT_KEYWORDS.any { it in l } } -> PaymentKind.POINT
@@ -112,8 +117,11 @@ object TossNotificationParser {
     }
 }
 
-/** 알림 종류. 분석에서는 PAYMENT/CANCEL만 실결제로 본다. */
-enum class PaymentKind { PAYMENT, CANCEL, POINT, OTHER }
+/**
+ * 알림 종류. 분석에서는 PAYMENT/CANCEL만 실결제로 본다.
+ * FAILED(결제 실패)는 돈이 나가지 않았지만 매장에서 결제를 시도한 것이라 위치 검증 데이터로는 쓸 수 있다.
+ */
+enum class PaymentKind { PAYMENT, CANCEL, FAILED, POINT, OTHER }
 
 data class CardMerchant(val cardName: String?, val merchant: String?, val payType: String?)
 

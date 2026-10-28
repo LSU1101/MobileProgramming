@@ -168,6 +168,7 @@ private fun RecordRow(r: PaymentRecord, isTarget: Boolean, onClick: () -> Unit) 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(TimeFormat.formatShort(r.receivedAt), style = MaterialTheme.typography.bodySmall)
             if (!isTarget) Text(r.packageName, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+            if (r.parsedKind == PaymentKind.FAILED) Text("[실패]", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
             if (r.parsedKind == PaymentKind.POINT) Text("[적립]", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
             if (r.parsedKind == PaymentKind.OTHER) Text("[기타]", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
             if (r.isTest) Text("[테스트]", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
